@@ -1,6 +1,4 @@
-import pygame
 import random
-import time
 
 class Chip8:
     def __init__(self):
@@ -164,16 +162,7 @@ class Chip8:
                 self.V[X] = self.delay_timer
 
             elif NN == 0x0A: # Wait for a key press, store the value of the key in VX.
-                key_pressed = False
-                while not key_pressed: # Loop until a key is pressed
-                    pygame.event.pump() # Process events
-                    keys = pygame.key.get_pressed()  # get all pressed keys
-                    for i in range(16):
-                        if keys[list(Emulator.keymap.keys())[list(Emulator.keymap.values()).index(i)]]: #check key by key
-                            self.V[X] = i  # Store key in VX
-                            key_pressed = True # Stop looking
-                            break  # from inner loop
-                time.sleep(0.01) #small delay
+                return "WAIT_FOR_KEY", X  # Signal the emulator loop to pause
 
             elif NN == 0x15: # set_delay(VX). Delay timer is set to VX.
                 self.delay_timer = self.V[X]    
@@ -198,4 +187,5 @@ class Chip8:
 
             elif NN == 0x65:  # Read registers V0 through VX from memory starting at location I.
                 for i in range(X + 1):
-                    self.V[i] = self.mem[self.I + i]
+                    self.V[i] = self.mem[self.I + i] 
+        return None #Normal execution
