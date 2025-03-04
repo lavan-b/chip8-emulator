@@ -16,7 +16,7 @@ class Chip8:
             for i, byte in enumerate(rom):
                 self.mem[0x200 + i] = byte  # Load ROM into memory starting at 0x200
 
-        def execute_cycle(self):
+    def execute_cycle(self):
         # Fetch opcode (2 bytes)
         opcode = (self.mem[self.pc] << 8) | self.mem[self.pc + 1]
         self.pc += 2  # Move to the next instruction
@@ -49,3 +49,11 @@ class Chip8:
         elif instr == 0x7000:  # ADD VX, NN (Add value to register)
             self.V[X] = (self.V[X] + NN) & 0xFF
 
+        # Update timers
+        if self.delay_timer > 0:
+            self.delay_timer -= 1
+
+        if self.sound_timer > 0:
+            if self.sound_timer == 1:
+                print("\a")  # System beep
+            self.sound_timer -= 1
