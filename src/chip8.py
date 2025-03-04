@@ -9,3 +9,9 @@ class Chip8:
         self.sound_timer = 0
         self.screen = [[0] * 64 for _ in range(32)]  # 64x32 res
         self.keys = [0] * 16   # Keypad keys
+
+    def load_rom(self, filename):
+        with open(filename, "rb") as f:
+            rom = f.read()
+            for i, byte in enumerate(rom):
+                self.mem[0x200 + i] = byte  # Load ROM into memory starting at 0x200
