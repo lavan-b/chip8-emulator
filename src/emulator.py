@@ -1,18 +1,27 @@
+# emulate.py
 import pygame
 import time
 import winsound
 import os
+import shlex # Add import
 from chip8 import Chip8  # Import the Chip8 class
 
 class Emulator:
-    def __init__(self, scale=10, rom_path="d:/breakout.ch8"): #default path
+    def __init__(self, scale=10): #rom_path="d:/breakout.ch8"
         pygame.init()
         self.scale = scale
         self.window = pygame.display.set_mode((64 * scale, 32 * scale))  # Make it actual size
         pygame.display.set_caption("Chip-8 Emulator")  # Set title bar
         self.clock = pygame.time.Clock()
         self.chip8 = Chip8()
-        self.rom_path = rom_path #path for the rom
+        #Get file path input
+        rom_path = input("Enter the path to the ROM file: ")
+        try:
+            self.rom_path = shlex.split(rom_path)[0] # Splits path ensuring it is a single element and handles quoting.
+        except:
+            print("Invalid Path, Exiting...") #error catching
+            exit()
+
         Emulator.keymap = {
             pygame.K_1: 0x1,
             pygame.K_2: 0x2,
@@ -33,6 +42,7 @@ class Emulator:
         }
         self.waiting_for_key = False
         self.key_register = None
+        self.speed_multiplier = float(input("Enter the emulation speed multiplier (e.g., 1.0, 0.5, 2.0): ")) #get input
 
     def handle_input(self):
         # Chekcs for quitting and key press
@@ -59,7 +69,11 @@ class Emulator:
 
     def run(self, speed=300):
         # Main emulation
-        self.chip8.load_rom(self.rom_path)
+        try: #Catches error if file doesn't exist.
+            self.chip8.load_rom(self.rom_path)
+        except FileNotFoundError:
+            print(f"Error: ROM file not found at {self.rom_path}")
+            return  # Exit if the ROM file isn't found
         rom_name = os.path.basename(self.rom_path)
         pygame.display.set_caption(f"CHIP-8 Emulator - Now Playing : {rom_name}")
 
@@ -67,7 +81,7 @@ class Emulator:
 
         # MAIN LOOP
         while running:
-            cycles = speed // 60
+            cycles = int((speed // 60) * self.speed_multiplier) #apply multiplier
             for _ in range(cycles):
                 if not self.handle_input():
                     running = False
