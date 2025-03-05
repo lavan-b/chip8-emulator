@@ -10,14 +10,18 @@ class Emulator:
         self.window = pygame.display.set_mode((640, 320), pygame.DOUBLEBUF)
         pygame.display.set_caption("Chip-8 Emulator") # title bar
         self.chip8 = Chip8()
-        self.previous_screen = set()
         self.last_tick = pygame.time.get_ticks()
         self.waiting_for_key = False
         self.key_register = None
-        
+        icon = pygame.image.load("icon.png")  # Load your icon image (must be a .png)
+        pygame.display.set_icon(icon)
+        # Initialize screen surface and scaling
+        self.screen_surface = pygame.Surface((64, 32))
+        self.screen_surface.fill((0, 0, 0))
+
         print('''|       Enter the path to ROM file      |
 +---------------------------------------+''')
-        self.rom_path = os.path.normpath(input("  > "))  # cleans input
+        self.rom_path = os.path.normpath(input("  > ")) # cleans input
         print('''+---------------------------------------+
 |              Enter speed              |
 |      (1 for default, or any float)    |
@@ -32,40 +36,33 @@ class Emulator:
         }
 
     def handle_input(self):
-        # Chekcs for quitting
-        for event in pygame.event.get():
+        for event in pygame.event.get():   # Chekcs for quitting
             if event.type == pygame.QUIT:
                 return False
-
-        # key event listener
         pressed = pygame.key.get_pressed()
-        for k, v in Emulator.keymap.items():
+        for k, v in Emulator.keymap.items(): # key event listener
             self.chip8.keys[v] = 1 if pressed[k] else 0
         return True
 
     def draw_screen(self):
-        updated_pixels = set()
-        for y in range(32):
-            for x in range(64):
-                if self.chip8.screen[y][x]:
-                    updated_pixels.add((x, y))
-                elif (x, y) in self.previous_screen:
-                    updated_pixels.add((x, y))
-
-        for x, y in updated_pixels:
-            color = (255, 255, 255) if self.chip8.screen[y][x] else (0, 0, 0)
-            pygame.draw.rect(self.window, color, (x * 10, y * 10, 10, 10))
-
+        if not self.chip8.screen_modified:
+            return
+        with pygame.PixelArray(self.screen_surface) as pixels:
+            for y in range(32):
+                for x in range(64):
+                    pixels[x, y] = 0xFFFFFF if self.chip8.screen[y][x] else 0x000000
+        scaled_surface = pygame.transform.scale(self.screen_surface, (640, 320))
+        self.window.blit(scaled_surface, (0, 0))
         pygame.display.flip()
-        self.previous_screen = updated_pixels
+        self.chip8.screen_modified = False
 
-    def run(self): # Main code
+    def run(self): # main code
         try:
             self.chip8.load_rom(self.rom_path)
         except FileNotFoundError:
             print(f"  Error: ROM file not found at {self.rom_path}")
             return
-        pygame.display.set_caption(f"CHIP-8 Emulator - Now Playing : {os.path.basename(self.rom_path)}")
+        pygame.display.set_caption(f"CHIP-8 Emulator - {os.path.basename(self.rom_path)}")
 
         print('''
 +---------------------------------------+
@@ -73,42 +70,41 @@ class Emulator:
 |           (Press ALT + TAB)           |
 +---------------------------------------+''')
         
-        running = True
-        while running: # the OG loop!
+        running = True  # the OG loop!
+        clock = pygame.time.Clock()
+        while running:
+            if not self.handle_input():
+                running = False
+                break
+
             cycles = int(10 * self.speed_multiplier)
             for _ in range(cycles):
-                if not self.handle_input():
-                    running = False
-                    break
-
-                if self.waiting_for_key: # Process events
+                if self.waiting_for_key:    # Process events
                     pygame.event.pump()
-                    keys = pygame.key.get_pressed()
                     for i in range(16):
-                        if keys[list(Emulator.keymap.keys())[list(Emulator.keymap.values()).index(i)]]:
+                        if self.chip8.keys[i]:
                             self.chip8.V[self.key_register] = i
                             self.waiting_for_key = False
                             break
-                    continue # No key pressed, continue waiting
+                    continue   #skip timers and screen draw
 
                 result = self.chip8.execute_cycle()
-                if result == ("WAIT_FOR_KEY",):
+                if result and result[0] == "WAIT_FOR_KEY":
                     self.waiting_for_key = True
                     self.key_register = result[1]
-                    continue #skip timers and screen draw
 
-            current_time = pygame.time.get_ticks()  #timer delay controls
+            current_time = pygame.time.get_ticks()     #timer delay controls
             elapsed = current_time - self.last_tick
             if elapsed >= 16:
-                self.chip8.delay_timer -= 4 if self.chip8.delay_timer > 0 else 0
+                self.chip8.delay_timer = max(0, self.chip8.delay_timer - 1)
                 if self.chip8.sound_timer > 0:
-                    self.chip8.sound_timer -= 2
+                    self.chip8.sound_timer = max(0, self.chip8.sound_timer - 1)
                     if self.chip8.sound_timer == 0:
                         winsound.Beep(420, 50)
                 self.last_tick = current_time
 
             self.draw_screen()
-            pygame.time.Clock().tick(60) # tick rate
+            clock.tick(60) # tick rate (kinda fps)
 
 if __name__ == "__main__":
     print('''
